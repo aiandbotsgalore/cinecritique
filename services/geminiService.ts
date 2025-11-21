@@ -1,19 +1,56 @@
 
 import { GoogleGenAI, Schema, Type, ChatSession } from "@google/genai";
 import { CritiqueAnalysis, TimelineEvent, AspectRatio } from "../types";
+import { cacheService } from "./indexedDBCache";
+import { backendClient } from "./backendClient";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Response cache for chat messages
+const chatResponseCache = new Map<string, string>();
+const MAX_CHAT_CACHE_SIZE = 100;
 
 // --- Analysis Service ---
 
 export const analyzeVideo = async (
-  file: File
+  file: File,
+  options: { useCache?: boolean; useBackend?: boolean } = {}
 ): Promise<CritiqueAnalysis> => {
+  const { useCache = true, useBackend = true } = options;
+
+  // Try backend first if available
+  if (useBackend && backendClient.isAvailable()) {
+    try {
+      console.log("[Backend] Using backend for analysis");
+      const result = await backendClient.analyzeVideo(file, { useCache });
+
+      if (result.cost_saved) {
+        console.log(`[Cost Savings] Saved $${result.cost_saved.toFixed(2)} with cache`);
+      }
+
+      return result.analysis;
+    } catch (error) {
+      console.warn("[Backend] Failed, falling back to direct Gemini:", error);
+    }
+  }
+
+  // Fallback to direct Gemini with IndexedDB cache
+  const cacheKey = useCache ? await cacheService.generateKey(file) : null;
+
+  // Check IndexedDB cache
+  if (cacheKey && useCache) {
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      console.log("[Cache] Using cached analysis");
+      return cached;
+    }
+  }
+
   const ai = getAI();
-  
+
   // 1. Upload the file using the File API
   console.log("Uploading file...", file.name);
-  
+
   try {
     const uploadResult = await ai.files.upload({
       file: file,
@@ -131,7 +168,15 @@ export const analyzeVideo = async (
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as CritiqueAnalysis;
+      const analysis = JSON.parse(response.text) as CritiqueAnalysis;
+
+      // Cache the result in IndexedDB
+      if (cacheKey) {
+        await cacheService.set(cacheKey, analysis, cacheKey, file.size);
+        console.log("[Cache] Stored analysis in IndexedDB");
+      }
+
+      return analysis;
     }
     throw new Error("No analysis generated.");
   } catch (error) {
@@ -168,11 +213,31 @@ export const initChat = async (analysis: CritiqueAnalysis) => {
   });
 };
 
-export const sendMessage = async (message: string): Promise<string> => {
+export const sendMessage = async (message: string, useCache: boolean = true): Promise<string> => {
   if (!chatSession) throw new Error("Chat not initialized");
-  
+
+  // Check cache
+  const cacheKey = `chat:${message.toLowerCase().trim()}`;
+  if (useCache && chatResponseCache.has(cacheKey)) {
+    console.log("[Chat Cache] Hit");
+    return chatResponseCache.get(cacheKey)!;
+  }
+
   const result = await chatSession.sendMessage({ message });
-  return result.text || "I couldn't generate a response.";
+  const response = result.text || "I couldn't generate a response.";
+
+  // Cache response
+  if (useCache) {
+    chatResponseCache.set(cacheKey, response);
+
+    // Limit cache size
+    if (chatResponseCache.size > MAX_CHAT_CACHE_SIZE) {
+      const firstKey = chatResponseCache.keys().next().value;
+      chatResponseCache.delete(firstKey);
+    }
+  }
+
+  return response;
 };
 
 // --- Image Generation Service (Imagen 4) ---

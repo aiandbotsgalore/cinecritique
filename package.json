@@ -1,12 +1,17 @@
 {
-  "name": "cinecritique-ai-original",
+  "name": "cinecritique-ai-enhanced",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:backend": "cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:backend\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "setup": "node scripts/setup.js",
+    "install-backend": "cd backend && pip install -r requirements.txt",
+    "download-model": "node scripts/download-local-model.js"
   },
   "dependencies": {
     "recharts": "^3.4.1",
@@ -19,6 +24,7 @@
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "concurrently": "^9.1.0"
   }
 }
