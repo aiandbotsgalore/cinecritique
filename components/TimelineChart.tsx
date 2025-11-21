@@ -12,7 +12,7 @@ const TimelineChart: React.FC<Props> = ({ data, onSelect }) => {
     <div className="h-64 w-full bg-slate-800 rounded-xl p-4 shadow-lg border border-slate-700">
       <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Visual Intensity Timeline</h3>
       <ResponsiveContainer width="100%" height="85%">
-        <BarChart data={data} onClick={(state) => {
+        <BarChart data={data} onClick={(state: any) => {
             if (state && state.activePayload && state.activePayload.length > 0) {
                 onSelect(state.activePayload[0].payload);
             }

@@ -1,18 +1,20 @@
 
-import { GoogleGenAI, Schema, Type, ChatSession } from "@google/genai";
+import { GoogleGenAI, Schema, Type } from "@google/genai";
 import { CritiqueAnalysis, TimelineEvent, AspectRatio } from "../types";
+import logger from "../utils/logger";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Analysis Service ---
 
 export const analyzeVideo = async (
-  file: File
+  file: File,
+  onProgress?: (status: string) => void
 ): Promise<CritiqueAnalysis> => {
   const ai = getAI();
   
   // 1. Upload the file using the File API
-  console.log("Uploading file...", file.name);
+  logger.debug("Uploading file...", file.name);
   
   try {
     const uploadResult = await ai.files.upload({
@@ -27,37 +29,54 @@ export const analyzeVideo = async (
     const fileData = (uploadResult as any).file ?? uploadResult;
 
     if (!fileData || !fileData.name || !fileData.uri) {
-      console.error("Upload Result:", JSON.stringify(uploadResult, null, 2));
+      logger.error("Upload Result:", JSON.stringify(uploadResult, null, 2));
       throw new Error("File upload failed: No valid file metadata returned.");
     }
 
     const fileName = fileData.name;
     const fileUri = fileData.uri;
-    console.log(`File uploaded: ${fileName} (${fileUri})`);
+    logger.debug(`File uploaded: ${fileName} (${fileUri})`);
 
-    // 2. Poll for processing completion
+    // 2. Poll for processing completion with exponential backoff
     let fileState = fileData.state;
+    let pollInterval = 2000; // Start with 2 seconds
+    const maxInterval = 10000; // Max 10 seconds
+    let attempts = 0;
+    const maxAttempts = 40; // ~5 minutes max (with exponential backoff)
+
     while (fileState === "PROCESSING") {
-      console.log("Processing file...");
-      await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
-      
+      const statusMessage = `Processing video... (attempt ${attempts + 1})`;
+      logger.debug(statusMessage);
+      onProgress?.(statusMessage);
+
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
       const fileStatus = await ai.files.get({ name: fileName });
-      
+
       // Handle potential wrapper
       const currentFile = (fileStatus as any).file ?? fileStatus;
-      
+
       if (!currentFile || !currentFile.state) {
-         console.error("File Status Response:", JSON.stringify(fileStatus, null, 2));
+         logger.error("File Status Response:", JSON.stringify(fileStatus, null, 2));
          throw new Error("Failed to check file status: Response missing file state.");
       }
-      
+
       fileState = currentFile.state;
       if (fileState === "FAILED") {
         throw new Error("Video processing failed on the server.");
       }
+
+      // Exponential backoff: increase poll interval up to max
+      pollInterval = Math.min(pollInterval * 1.5, maxInterval);
+      attempts++;
+
+      if (attempts >= maxAttempts) {
+        throw new Error("Processing timeout - video may be too large or processing failed.");
+      }
     }
 
-    console.log("File processing complete. Generating critique...");
+    logger.debug("File processing complete. Generating critique...");
+    onProgress?.("Generating critique...");
 
     // Schema definition for structured output
     const responseSchema: Schema = {
@@ -135,14 +154,14 @@ export const analyzeVideo = async (
     }
     throw new Error("No analysis generated.");
   } catch (error) {
-    console.error("Analysis failed:", error);
+    logger.error("Analysis failed:", error);
     throw error;
   }
 };
 
 // --- Chat Service ---
 
-let chatSession: ChatSession | null = null;
+let chatSession: ReturnType<ReturnType<typeof getAI>['chats']['create']> | null = null;
 
 export const initChat = async (analysis: CritiqueAnalysis) => {
   const ai = getAI();
@@ -192,10 +211,10 @@ export const generateImage = async (prompt: string, aspectRatio: AspectRatio): P
 
     const base64ImageBytes = response.generatedImages?.[0]?.image?.imageBytes;
     if (!base64ImageBytes) throw new Error("No image generated");
-    
+
     return `data:image/jpeg;base64,${base64ImageBytes}`;
   } catch (error) {
-    console.error("Image gen failed:", error);
+    logger.error("Image gen failed:", error);
     throw error;
   }
 };
@@ -234,7 +253,7 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
     }
     throw new Error("No edited image returned");
   } catch (error) {
-    console.error("Image edit failed:", error);
+    logger.error("Image edit failed:", error);
     throw error;
   }
 };

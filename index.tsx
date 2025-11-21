@@ -1,6 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import ErrorBoundary from './components/ErrorBoundary';
+import { GeminiProvider } from './contexts/GeminiContext';
+import './styles/index.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -10,6 +13,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <GeminiProvider>
+        <App />
+      </GeminiProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

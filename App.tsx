@@ -1,13 +1,17 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { UploadCloud, Play, Pause, AlertCircle, CheckCircle2, ChevronRight, Maximize2, Film } from 'lucide-react';
 import { VideoData, CritiqueAnalysis, TimelineEvent } from './types';
-import { analyzeVideo, initChat } from './services/geminiService';
-import TimelineChart from './components/TimelineChart';
-import ChatInterface from './components/ChatInterface';
-import ImageStudio from './components/ImageStudio';
+import { analyzeVideo } from './services/geminiService';
+import { useGemini } from './contexts/GeminiContext';
+
+// Lazy load heavy components for better initial bundle size
+const TimelineChart = lazy(() => import('./components/TimelineChart'));
+const ChatInterface = lazy(() => import('./components/ChatInterface'));
+const ImageStudio = lazy(() => import('./components/ImageStudio'));
 
 const App: React.FC = () => {
+  const { initChat } = useGemini();
   // State
   const [video, setVideo] = useState<VideoData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -25,12 +29,24 @@ const App: React.FC = () => {
   const [selectedPrompt, setSelectedPrompt] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
 
+  // Cleanup video Object URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (video?.url) {
+        URL.revokeObjectURL(video.url);
+      }
+    };
+  }, [video?.url]);
+
   // Handlers
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Removed size limit check to support large files via File API
-      
+      // Revoke previous Object URL to prevent memory leak
+      if (video?.url) {
+        URL.revokeObjectURL(video.url);
+      }
+
       const mimeType = file.type;
       setVideo({
         file,
@@ -46,15 +62,16 @@ const App: React.FC = () => {
     if (!video) return;
     setIsAnalyzing(true);
     setAnalysisStatus("Uploading video to Gemini...");
-    
+
     try {
-      // We now pass the file directly. analyzeVideo handles the upload/processing.
-      // We'll update status periodically if needed, but for now relying on loading state.
-      const result = await analyzeVideo(video.file);
-      
+      // Pass progress callback to get real-time status updates
+      const result = await analyzeVideo(video.file, (status) => {
+        setAnalysisStatus(status);
+      });
+
       setCritique(result);
       setAnalysisStatus("Initializing creative assistant...");
-      
+
       // Initialize chat with this context
       await initChat(result);
       setAnalysisStatus("");
@@ -177,10 +194,16 @@ const App: React.FC = () => {
           {/* Visual Timeline Graph */}
           {critique && (
             <div className="h-1/3 bg-slate-900 border-t border-slate-800 p-6 overflow-hidden">
-                <TimelineChart 
-                    data={critique.timeline} 
-                    onSelect={(event) => jumpToTimestamp(event.seconds)}
-                />
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                  </div>
+                }>
+                  <TimelineChart
+                      data={critique.timeline}
+                      onSelect={(event) => jumpToTimestamp(event.seconds)}
+                  />
+                </Suspense>
             </div>
           )}
         </div>
@@ -275,19 +298,27 @@ const App: React.FC = () => {
 
             {/* Chatbot Widget (Fixed at bottom of right column) */}
             <div className="h-[40%] border-t border-slate-800 p-4 bg-slate-950">
-               <ChatInterface initialMessages={[]} />
+               <Suspense fallback={
+                 <div className="flex items-center justify-center h-full">
+                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                 </div>
+               }>
+                 <ChatInterface initialMessages={[]} />
+               </Suspense>
             </div>
         </div>
       </div>
 
       {/* Image Studio Modal */}
-      <ImageStudio 
-        isOpen={isStudioOpen} 
-        onClose={() => setIsStudioOpen(false)} 
-        initialPrompt={selectedPrompt}
-        referenceTime={selectedTime}
-        getVideoFrame={captureFrame}
-      />
+      <Suspense fallback={null}>
+        <ImageStudio
+          isOpen={isStudioOpen}
+          onClose={() => setIsStudioOpen(false)}
+          initialPrompt={selectedPrompt}
+          referenceTime={selectedTime}
+          getVideoFrame={captureFrame}
+        />
+      </Suspense>
     </div>
   );
 };

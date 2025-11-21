@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { ChatMessage, ChatRole } from '../types';
-import { sendMessage } from '../services/geminiService';
+import { useGemini } from '../contexts/GeminiContext';
 
 interface Props {
   initialMessages?: ChatMessage[];
 }
 
 const ChatInterface: React.FC<Props> = ({ initialMessages = [] }) => {
+  const { sendMessage } = useGemini();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
