@@ -1,7 +1,8 @@
 
 import { GoogleGenAI, Schema, Type } from "@google/genai";
-import { CritiqueAnalysis, TimelineEvent, AspectRatio } from "../types";
+import { CritiqueAnalysis, TimelineEvent, AspectRatio, Shot, DirectorStyleMatch } from "../types";
 import logger from "../utils/logger";
+import { analyzeMusicSync } from "../utils/musicSync";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -9,7 +10,8 @@ const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeVideo = async (
   file: File,
-  onProgress?: (status: string) => void
+  onProgress?: (status: string) => void,
+  referenceFiles?: File[]
 ): Promise<CritiqueAnalysis> => {
   const ai = getAI();
   
@@ -78,7 +80,32 @@ export const analyzeVideo = async (
     logger.debug("File processing complete. Generating critique...");
     onProgress?.("Generating critique...");
 
-    // Schema definition for structured output
+    // Upload reference files if provided
+    let referenceUris: string[] = [];
+    if (referenceFiles && referenceFiles.length > 0) {
+      onProgress?.("Uploading reference files...");
+      for (const refFile of referenceFiles) {
+        try {
+          const refUpload = await ai.files.upload({
+            file: refFile,
+            config: {
+              mimeType: refFile.type,
+              displayName: refFile.name
+            },
+          });
+
+          const refData = (refUpload as any).file ?? refUpload;
+          if (refData?.uri) {
+            referenceUris.push(refData.uri);
+            logger.debug(`Reference file uploaded: ${refFile.name}`);
+          }
+        } catch (error) {
+          logger.warn(`Failed to upload reference file ${refFile.name}:`, error);
+        }
+      }
+    }
+
+    // Schema definition for structured output with enhanced features
     const responseSchema: Schema = {
       type: Type.OBJECT,
       properties: {
@@ -110,37 +137,136 @@ export const analyzeVideo = async (
             required: ["timestamp", "seconds", "title", "issue", "reason", "fix", "nanoBananaPrompt", "severity"],
           },
         },
+        shots: {
+          type: Type.ARRAY,
+          description: "Shot-by-shot breakdown of the video",
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              shotNumber: { type: Type.NUMBER },
+              startTime: { type: Type.STRING, description: "MM:SS format" },
+              endTime: { type: Type.STRING, description: "MM:SS format" },
+              startSeconds: { type: Type.NUMBER },
+              endSeconds: { type: Type.NUMBER },
+              shotType: { type: Type.STRING, description: "Wide, Medium, Close-up, etc." },
+              movement: { type: Type.STRING, description: "Static, Pan, Dolly, etc." },
+              description: { type: Type.STRING },
+              lighting: { type: Type.STRING },
+              composition: { type: Type.STRING },
+            },
+            required: ["shotNumber", "startTime", "endTime", "startSeconds", "endSeconds", "shotType", "movement", "description", "lighting", "composition"],
+          },
+        },
+        directorStyle: {
+          type: Type.ARRAY,
+          description: "Famous directors this video resembles stylistically",
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              director: { type: Type.STRING },
+              percentage: { type: Type.NUMBER, description: "Similarity percentage" },
+              characteristics: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Specific visual/editing characteristics that match"
+              },
+            },
+            required: ["director", "percentage", "characteristics"],
+          },
+        },
+        ...(referenceUris.length > 0 ? {
+          styleComparison: {
+            type: Type.STRING,
+            description: "Detailed comparison of this video's style to the provided reference materials"
+          }
+        } : {}),
       },
-      required: ["summary", "timeline"],
+      required: ["summary", "timeline", "shots", "directorStyle"],
     };
 
-    const prompt = `
-      Act as a world-class film critic, editor, and cinematographer.
-      Analyze this music video frame by frame.
-      
+    let prompt = `
+      Act as a world-class film critic, editor, and cinematographer with expertise in music video direction.
+      Analyze this music video comprehensively.
+
+      ## PART 1: Professional Critique
       Provide a professional critique covering:
-      1. Storytelling & Concept
-      2. Editing Rhythm & Pacing
-      3. Cinematography & Lighting
-      4. Music Integration
-      
-      Then, identify specific weak moments. For each moment, provide a "Nano Banana Prompt" - a highly descriptive prompt that could be used to generate a concept image of how that shot SHOULD look.
-      
-      Be harsh but constructive.
+      1. Storytelling & Concept - narrative coherence, artistic vision
+      2. Editing Rhythm & Pacing - cut timing, flow, energy
+      3. Cinematography & Lighting - shot composition, color, visual quality
+      4. Music Integration - how well visuals sync with audio
+
+      ## PART 2: Timeline Issues
+      Identify specific weak moments chronologically. For each:
+      - Timestamp and severity (1-10 scale)
+      - What's wrong and why it matters
+      - How to fix it
+      - A "Nano Banana Prompt" - a highly descriptive AI image generation prompt showing how the shot SHOULD look
+
+      ## PART 3: Shot-by-Shot Breakdown
+      Analyze every distinct shot/cut in the video. For each shot provide:
+      - Exact start/end times
+      - Shot type (Wide, Medium, Close-up, Extreme Close-up, POV, Over-the-Shoulder)
+      - Camera movement (Static, Pan, Tilt, Dolly, Handheld, Steadicam, Crane)
+      - Visual description
+      - Lighting analysis (natural/artificial, mood, quality)
+      - Composition notes (rule of thirds, leading lines, symmetry, depth)
+
+      ## PART 4: Director Style Analysis
+      Compare this video's style to famous music video directors. Identify the top 3-4 directors whose work this resembles.
+      For each match:
+      - Director name (e.g., Hiro Murai, Dave Meyers, Spike Jonze, Michel Gondry, Kahlil Joseph)
+      - Percentage similarity (must total ~100% across all directors)
+      - Specific visual or editing characteristics that match their signature style
+
+      Be detailed, honest, and constructive. This analysis will be used for professional improvement.
     `;
+
+    // Add reference comparison section if references are provided
+    if (referenceUris.length > 0) {
+      prompt += `
+
+      ## PART 5: Style Reference Comparison
+      The user has provided ${referenceUris.length} reference video(s)/image(s) for style comparison.
+      Analyze how well this video matches the aesthetic, mood, pacing, and visual style of the references.
+      Provide specific feedback on:
+      - Color grading similarities/differences
+      - Shot composition alignment
+      - Pacing and rhythm comparison
+      - Lighting approach similarities
+      - What to adjust to better match the reference style
+      `;
+    }
+
+    // Build content parts array
+    const contentParts: any[] = [
+      {
+        fileData: {
+          mimeType: file.type || "video/mp4",
+          fileUri: fileUri,
+        }
+      },
+    ];
+
+    // Add reference files if available
+    if (referenceUris.length > 0) {
+      referenceUris.forEach((uri, index) => {
+        const refFile = referenceFiles![index];
+        contentParts.push({
+          fileData: {
+            mimeType: refFile.type,
+            fileUri: uri,
+          }
+        });
+      });
+    }
+
+    // Add text prompt
+    contentParts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: {
-        parts: [
-          { 
-            fileData: {
-              mimeType: file.type || "video/mp4",
-              fileUri: fileUri,
-            }
-          },
-          { text: prompt },
-        ],
+        parts: contentParts,
       },
       config: {
         responseMimeType: "application/json",
@@ -150,7 +276,20 @@ export const analyzeVideo = async (
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as CritiqueAnalysis;
+      const critique = JSON.parse(response.text) as CritiqueAnalysis;
+
+      // Add music sync analysis
+      onProgress?.("Analyzing music sync...");
+      try {
+        const musicSync = await analyzeMusicSync(file, critique.timeline);
+        critique.musicSync = musicSync;
+        logger.debug(`Music sync analysis complete. BPM: ${musicSync.bpm}, Score: ${musicSync.syncScore}`);
+      } catch (error) {
+        logger.warn("Music sync analysis failed, continuing without it:", error);
+        // Continue without music sync if it fails
+      }
+
+      return critique;
     }
     throw new Error("No analysis generated.");
   } catch (error) {

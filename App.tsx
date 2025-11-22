@@ -1,9 +1,14 @@
 
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { UploadCloud, Play, Pause, AlertCircle, CheckCircle2, ChevronRight, Maximize2, Film } from 'lucide-react';
-import { VideoData, CritiqueAnalysis, TimelineEvent } from './types';
+import { UploadCloud, Play, Pause, AlertCircle, CheckCircle2, ChevronRight, Maximize2, Film, Upload } from 'lucide-react';
+import { VideoData, CritiqueAnalysis, TimelineEvent, SavedProject, ChatMessage } from './types';
 import { analyzeVideo } from './services/geminiService';
 import { useGemini } from './contexts/GeminiContext';
+import ActionToolbar from './components/ActionToolbar';
+import DirectorStyleCard from './components/DirectorStyleCard';
+import ShotBreakdown from './components/ShotBreakdown';
+import MusicSyncDisplay from './components/MusicSyncDisplay';
+import VideoEffectsPanel from './components/VideoEffectsPanel';
 
 // Lazy load heavy components for better initial bundle size
 const TimelineChart = lazy(() => import('./components/TimelineChart'));
@@ -16,9 +21,11 @@ const App: React.FC = () => {
   const [video, setVideo] = useState<VideoData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [critique, setCritique] = useState<CritiqueAnalysis | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'advanced'>('overview');
   const [analysisStatus, setAnalysisStatus] = useState<string>("");
-  
+  const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+
   // Video Player State
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -64,10 +71,12 @@ const App: React.FC = () => {
     setAnalysisStatus("Uploading video to Gemini...");
 
     try {
-      // Pass progress callback to get real-time status updates
-      const result = await analyzeVideo(video.file, (status) => {
-        setAnalysisStatus(status);
-      });
+      // Pass progress callback and reference files to get enhanced analysis
+      const result = await analyzeVideo(
+        video.file,
+        (status) => setAnalysisStatus(status),
+        referenceFiles.length > 0 ? referenceFiles : undefined
+      );
 
       setCritique(result);
       setAnalysisStatus("Initializing creative assistant...");
@@ -82,6 +91,18 @@ const App: React.FC = () => {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleLoadProject = (project: SavedProject) => {
+    setCritique(project.critique);
+    setChatHistory(project.chatHistory);
+    initChat(project.critique);
+    setActiveTab('overview');
+  };
+
+  const handleReferenceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setReferenceFiles(files);
   };
 
   const captureFrame = (): string | null => {
@@ -155,20 +176,42 @@ const App: React.FC = () => {
           </div>
           <span className="font-bold text-lg text-slate-100 tracking-tight">CineCritique AI</span>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3 items-center">
             {!critique && !isAnalyzing && (
-                <button 
+              <>
+                <label className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg text-sm transition-all flex items-center gap-2 cursor-pointer">
+                  <Upload size={16} />
+                  Add Reference ({referenceFiles.length})
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="video/*,image/*"
+                    multiple
+                    onChange={handleReferenceUpload}
+                  />
+                </label>
+                <button
                     onClick={runAnalysis}
-                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-full text-sm transition-all flex items-center gap-2 shadow-lg shadow-indigo-900/20"
+                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-all flex items-center gap-2 shadow-lg shadow-indigo-900/20"
                 >
                     <Play size={16} fill="currentColor" /> Start Analysis
                 </button>
+              </>
             )}
              {isAnalyzing && (
-                <div className="flex items-center gap-3 px-4 py-2 bg-slate-800 rounded-full border border-slate-700">
+                <div className="flex items-center gap-3 px-4 py-2 bg-slate-800 rounded-lg border border-slate-700">
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
                     <span className="text-sm text-indigo-300">{analysisStatus || "Gemini is watching..."}</span>
                 </div>
+             )}
+             {critique && (
+                <ActionToolbar
+                  critique={critique}
+                  videoName={video?.file.name || 'video'}
+                  videoSize={video?.file.size || 0}
+                  chatHistory={chatHistory}
+                  onLoadProject={handleLoadProject}
+                />
              )}
         </div>
       </header>
@@ -212,19 +255,26 @@ const App: React.FC = () => {
         <div className="w-[40%] flex flex-col bg-slate-900">
             {/* Tabs */}
             <div className="flex border-b border-slate-800">
-                <button 
+                <button
                     onClick={() => setActiveTab('overview')}
-                    className={`flex-1 py-4 text-sm font-medium transition-colors relative ${activeTab === 'overview' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`flex-1 py-4 text-xs font-medium transition-colors relative ${activeTab === 'overview' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
                 >
-                    Critique & Overview
+                    Overview
                     {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500"></div>}
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('details')}
-                    className={`flex-1 py-4 text-sm font-medium transition-colors relative ${activeTab === 'details' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`flex-1 py-4 text-xs font-medium transition-colors relative ${activeTab === 'details' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
                 >
-                    Details & Fixes
+                    Issues & Fixes
                     {activeTab === 'details' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500"></div>}
+                </button>
+                <button
+                    onClick={() => setActiveTab('advanced')}
+                    className={`flex-1 py-4 text-xs font-medium transition-colors relative ${activeTab === 'advanced' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    Advanced ✨
+                    {activeTab === 'advanced' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500"></div>}
                 </button>
             </div>
 
@@ -290,6 +340,43 @@ const App: React.FC = () => {
                                         </button>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'advanced' && (
+                            <div className="p-6 space-y-6">
+                                {/* Director Style Card */}
+                                {critique.directorStyle && critique.directorStyle.length > 0 && (
+                                    <DirectorStyleCard directorStyles={critique.directorStyle} />
+                                )}
+
+                                {/* Music Sync Analysis */}
+                                {critique.musicSync && (
+                                    <MusicSyncDisplay musicSync={critique.musicSync} />
+                                )}
+
+                                {/* Style Reference Comparison */}
+                                {critique.styleComparison && (
+                                    <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                                        <h3 className="text-lg font-bold text-white mb-4">
+                                            📸 Style Reference Comparison
+                                        </h3>
+                                        <p className="text-slate-300 text-sm whitespace-pre-wrap">
+                                            {critique.styleComparison}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Shot-by-Shot Breakdown */}
+                                {critique.shots && critique.shots.length > 0 && (
+                                    <ShotBreakdown
+                                        shots={critique.shots}
+                                        onShotClick={(shot) => jumpToTimestamp(shot.startSeconds)}
+                                    />
+                                )}
+
+                                {/* Video Effects Panel */}
+                                <VideoEffectsPanel videoRef={videoRef} />
                             </div>
                         )}
                     </>
