@@ -1,13 +1,45 @@
+/**
+ * Google Gemini AI service integration for video analysis, chat, and image generation.
+ * Provides comprehensive video critique using Gemini 3 Pro with structured output,
+ * interactive chat capabilities, and image generation/editing features.
+ * @module services/geminiService
+ */
 
 import { GoogleGenAI, Schema, Type } from "@google/genai";
 import { CritiqueAnalysis, TimelineEvent, AspectRatio, Shot, DirectorStyleMatch } from "../types";
 import logger from "../utils/logger";
 import { analyzeMusicSync } from "../utils/musicSync";
 
+/**
+ * Creates and returns a GoogleGenAI instance with API key from environment.
+ *
+ * @returns {GoogleGenAI} Initialized Google Gemini AI client
+ */
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Analysis Service ---
 
+/**
+ * Analyzes a video file using Gemini AI to generate comprehensive critique.
+ * Performs shot-by-shot analysis, identifies timeline issues, compares to director styles,
+ * and optionally compares against reference materials.
+ * Includes automatic music sync analysis using Web Audio API.
+ *
+ * @async
+ * @param {File} file - The video file to analyze
+ * @param {(status: string) => void} [onProgress] - Optional callback for progress updates
+ * @param {File[]} [referenceFiles] - Optional reference videos/images for style comparison
+ * @returns {Promise<CritiqueAnalysis>} Complete analysis including summary, timeline, shots, director style, and music sync
+ * @throws {Error} If upload fails, processing times out, or analysis generation fails
+ *
+ * @example
+ * const analysis = await analyzeVideo(
+ *   videoFile,
+ *   (status) => console.log(status),
+ *   [referenceFile1, referenceFile2]
+ * );
+ * console.log(analysis.summary.verdict);
+ */
 export const analyzeVideo = async (
   file: File,
   onProgress?: (status: string) => void,
@@ -300,8 +332,27 @@ export const analyzeVideo = async (
 
 // --- Chat Service ---
 
+/**
+ * Global chat session instance for maintaining conversation context.
+ * Initialized with analysis data to provide context-aware responses.
+ *
+ * @type {ReturnType<ReturnType<typeof getAI>['chats']['create']> | null}
+ */
 let chatSession: ReturnType<ReturnType<typeof getAI>['chats']['create']> | null = null;
 
+/**
+ * Initializes a chat session with the analysis results as context.
+ * The AI assistant can answer questions about the analysis, explain terms,
+ * and provide suggestions based on the critique data.
+ *
+ * @async
+ * @param {CritiqueAnalysis} analysis - The complete analysis to provide as context
+ * @returns {Promise<void>}
+ *
+ * @example
+ * await initChat(critiqueAnalysis);
+ * const response = await sendMessage("Can you explain the shot at 1:23?");
+ */
 export const initChat = async (analysis: CritiqueAnalysis) => {
   const ai = getAI();
   const systemInstruction = `
@@ -326,6 +377,19 @@ export const initChat = async (analysis: CritiqueAnalysis) => {
   });
 };
 
+/**
+ * Sends a message to the active chat session and returns the AI's response.
+ * Chat must be initialized with initChat() before calling this function.
+ *
+ * @async
+ * @param {string} message - The user's message to send
+ * @returns {Promise<string>} The AI's text response
+ * @throws {Error} If chat session is not initialized
+ *
+ * @example
+ * const response = await sendMessage("How can I improve the lighting at 2:15?");
+ * console.log(response);
+ */
 export const sendMessage = async (message: string): Promise<string> => {
   if (!chatSession) throw new Error("Chat not initialized");
   
@@ -335,6 +399,23 @@ export const sendMessage = async (message: string): Promise<string> => {
 
 // --- Image Generation Service (Imagen 4) ---
 
+/**
+ * Generates a new image from a text prompt using Google's Imagen 4 model.
+ * Useful for visualizing suggested improvements or creating reference images.
+ *
+ * @async
+ * @param {string} prompt - Detailed description of the image to generate
+ * @param {AspectRatio} aspectRatio - Desired aspect ratio (e.g., '16:9', '1:1')
+ * @returns {Promise<string>} Base64-encoded data URL of the generated JPEG image
+ * @throws {Error} If image generation fails or returns no image
+ *
+ * @example
+ * const imageUrl = await generateImage(
+ *   "A cinematic wide shot of a person in a neon-lit cityscape",
+ *   "16:9"
+ * );
+ * imgElement.src = imageUrl;
+ */
 export const generateImage = async (prompt: string, aspectRatio: AspectRatio): Promise<string> => {
   const ai = getAI();
   try {
@@ -360,6 +441,23 @@ export const generateImage = async (prompt: string, aspectRatio: AspectRatio): P
 
 // --- Image Editing Service (Gemini 2.5 Flash Image) ---
 
+/**
+ * Edits an existing image using natural language instructions via Gemini 2.5 Flash.
+ * Can modify colors, composition, add/remove elements, and more based on text prompts.
+ *
+ * @async
+ * @param {string} base64Image - Base64-encoded source image (with or without data URL prefix)
+ * @param {string} prompt - Natural language editing instructions
+ * @returns {Promise<string>} Base64-encoded data URL of the edited PNG image
+ * @throws {Error} If image editing fails or returns no image
+ *
+ * @example
+ * const editedImage = await editImage(
+ *   originalImageDataUrl,
+ *   "Make the lighting warmer and increase contrast"
+ * );
+ * imgElement.src = editedImage;
+ */
 export const editImage = async (base64Image: string, prompt: string): Promise<string> => {
   const ai = getAI();
   

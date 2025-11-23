@@ -1,3 +1,23 @@
+/**
+ * CineCritique AI - Professional Music Video Analysis Tool
+ *
+ * Main application component that orchestrates video upload, AI-powered analysis,
+ * and interactive features including chat, shot breakdown, director style matching,
+ * music sync analysis, and real-time video effects.
+ *
+ * Features:
+ * - Video upload and analysis using Google Gemini AI
+ * - Shot-by-shot cinematographic breakdown
+ * - Director style matching against famous directors
+ * - Music synchronization analysis with beat detection
+ * - Real-time WebGL color correction preview
+ * - Interactive chat for follow-up questions
+ * - PDF report export
+ * - Project save/load with localStorage
+ * - Style reference comparison
+ *
+ * @module App
+ */
 
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { UploadCloud, Play, Pause, AlertCircle, CheckCircle2, ChevronRight, Maximize2, Film, Upload } from 'lucide-react';
@@ -10,11 +30,17 @@ import ShotBreakdown from './components/ShotBreakdown';
 import MusicSyncDisplay from './components/MusicSyncDisplay';
 import VideoEffectsPanel from './components/VideoEffectsPanel';
 
-// Lazy load heavy components for better initial bundle size
+// Lazy load heavy components for better initial bundle size and faster TTI
 const TimelineChart = lazy(() => import('./components/TimelineChart'));
 const ChatInterface = lazy(() => import('./components/ChatInterface'));
 const ImageStudio = lazy(() => import('./components/ImageStudio'));
 
+/**
+ * Main application component for CineCritique AI.
+ * Manages video upload, analysis, playback, and all interactive features.
+ *
+ * @returns {JSX.Element} The complete CineCritique AI application
+ */
 const App: React.FC = () => {
   const { initChat } = useGemini();
   // State

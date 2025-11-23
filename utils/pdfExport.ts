@@ -1,7 +1,27 @@
+/**
+ * PDF export utilities for generating professional critique reports.
+ * Uses jsPDF for document generation and html2canvas for capturing visual elements.
+ * @module utils/pdfExport
+ */
+
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { CritiqueAnalysis } from '../types';
 
+/**
+ * Generates and downloads a professionally formatted PDF report of the video critique.
+ * The report includes verdict, summary sections, timeline issues, director style analysis,
+ * music sync data, and shot-by-shot breakdown.
+ *
+ * @async
+ * @param {CritiqueAnalysis} critique - The complete critique analysis to include in the report
+ * @param {string} videoName - Original name of the analyzed video file
+ * @returns {Promise<void>} Resolves when the PDF is generated and download is triggered
+ *
+ * @example
+ * await generatePDFReport(critiqueData, 'my-music-video.mp4');
+ * // Downloads: CineCritique_my-music-video_2025-01-15.pdf
+ */
 export const generatePDFReport = async (
   critique: CritiqueAnalysis,
   videoName: string
@@ -12,7 +32,14 @@ export const generatePDFReport = async (
   const margin = 20;
   let yPosition = margin;
 
-  // Helper function to add text with wrapping
+  /**
+   * Helper function to add text to the PDF with automatic line wrapping and page breaks.
+   * Handles pagination automatically when content exceeds page boundaries.
+   *
+   * @param {string} text - The text content to add
+   * @param {number} fontSize - Font size in points
+   * @param {boolean} [isBold=false] - Whether to use bold font weight
+   */
   const addText = (text: string, fontSize: number, isBold = false) => {
     pdf.setFontSize(fontSize);
     if (isBold) {
@@ -33,6 +60,11 @@ export const generatePDFReport = async (
     yPosition += lines.length * fontSize * 0.35 + 5;
   };
 
+  /**
+   * Adds vertical spacing in the PDF document.
+   *
+   * @param {number} height - Height of spacing in millimeters
+   */
   const addSpacer = (height: number) => {
     yPosition += height;
   };
@@ -184,6 +216,20 @@ export const generatePDFReport = async (
   pdf.save(fileName);
 };
 
+/**
+ * Captures a DOM element as a PNG image for inclusion in reports.
+ * Primarily used for capturing timeline charts and visualizations.
+ *
+ * @async
+ * @param {string} elementId - The DOM element ID to capture
+ * @returns {Promise<string | null>} Data URL of the captured image, or null if capture fails
+ *
+ * @example
+ * const chartImage = await captureTimelineChart('timeline-chart');
+ * if (chartImage) {
+ *   // Use the data URL in PDF or elsewhere
+ * }
+ */
 export const captureTimelineChart = async (elementId: string): Promise<string | null> => {
   const element = document.getElementById(elementId);
   if (!element) return null;

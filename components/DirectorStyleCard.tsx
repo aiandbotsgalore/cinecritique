@@ -1,11 +1,32 @@
+/**
+ * Director style analysis display component.
+ * Shows percentage matches to famous directors with their signature characteristics.
+ * Displays top matches with medal indicators and visual progress bars.
+ * @module components/DirectorStyleCard
+ */
+
 import React from 'react';
 import { DirectorStyleMatch } from '../types';
 import { Award, TrendingUp } from 'lucide-react';
 
+/**
+ * Props for the DirectorStyleCard component.
+ */
 interface Props {
+  /** Array of director style matches sorted by percentage */
   directorStyles: DirectorStyleMatch[];
 }
 
+/**
+ * Displays director style analysis showing which famous directors the video resembles.
+ * Shows top 3-4 matches with percentage similarity and characteristic details.
+ *
+ * @param {Props} props - Component props
+ * @returns {JSX.Element | null} Rendered director style cards or null if no data
+ *
+ * @example
+ * <DirectorStyleCard directorStyles={analysis.directorStyle} />
+ */
 const DirectorStyleCard: React.FC<Props> = ({ directorStyles }) => {
   if (!directorStyles || directorStyles.length === 0) {
     return null;

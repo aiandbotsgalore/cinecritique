@@ -1,3 +1,10 @@
+/**
+ * Action toolbar for project management and export functionality.
+ * Provides buttons for PDF export, project save/load, and project management.
+ * Includes modal for viewing and managing saved projects.
+ * @module components/ActionToolbar
+ */
+
 import React, { useState } from 'react';
 import { CritiqueAnalysis, ChatMessage, SavedProject } from '../types';
 import { generatePDFReport } from '../utils/pdfExport';
@@ -5,14 +12,38 @@ import { saveProject, loadAllProjects, loadProject, deleteProject } from '../uti
 import { FileDown, Save, FolderOpen, Trash2, Download } from 'lucide-react';
 import logger from '../utils/logger';
 
+/**
+ * Props for the ActionToolbar component.
+ */
 interface Props {
+  /** Current critique analysis (null if no analysis) */
   critique: CritiqueAnalysis | null;
+  /** Name of the analyzed video file */
   videoName: string;
+  /** Size of the video file in bytes */
   videoSize: number;
+  /** Current chat message history */
   chatHistory: ChatMessage[];
+  /** Callback when a saved project is loaded */
   onLoadProject: (project: SavedProject) => void;
 }
 
+/**
+ * Toolbar providing actions for exporting PDF reports and managing saved projects.
+ * Includes save, load, and delete functionality with localStorage persistence.
+ *
+ * @param {Props} props - Component props
+ * @returns {JSX.Element} Rendered action toolbar
+ *
+ * @example
+ * <ActionToolbar
+ *   critique={analysis}
+ *   videoName="video.mp4"
+ *   videoSize={5242880}
+ *   chatHistory={messages}
+ *   onLoadProject={(project) => restoreProject(project)}
+ * />
+ */
 const ActionToolbar: React.FC<Props> = ({ critique, videoName, videoSize, chatHistory, onLoadProject }) => {
   const [showSavedProjects, setShowSavedProjects] = useState(false);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);

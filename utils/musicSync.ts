@@ -1,8 +1,25 @@
+/**
+ * Music synchronization analysis using Web Audio API.
+ * Detects beats in the audio track and analyzes how well video cuts align with the music.
+ * Uses energy-based beat detection with adaptive thresholding.
+ * @module utils/musicSync
+ */
+
 import { MusicSyncAnalysis, BeatMarker, TimelineEvent } from '../types';
 import logger from './logger';
 
 /**
- * Analyzes music sync using Web Audio API beat detection
+ * Analyzes how well video edits synchronize with the music's beat.
+ * Performs beat detection using Web Audio API, estimates BPM, and calculates a sync score.
+ *
+ * @async
+ * @param {File} videoFile - The video file containing audio to analyze
+ * @param {TimelineEvent[]} timelineEvents - Array of timeline events representing cuts/edits
+ * @returns {Promise<MusicSyncAnalysis>} Complete music sync analysis with beats, BPM, and sync score
+ *
+ * @example
+ * const analysis = await analyzeMusicSync(videoFile, timelineEvents);
+ * console.log(`BPM: ${analysis.bpm}, Sync Score: ${analysis.syncScore}/100`);
  */
 export const analyzeMusicSync = async (
   videoFile: File,
@@ -60,7 +77,16 @@ export const analyzeMusicSync = async (
 };
 
 /**
- * Detect beats using energy-based algorithm
+ * Detects beats in an audio buffer using energy-based algorithm.
+ * Uses a sliding window to calculate energy levels and adaptive thresholding
+ * based on statistical variance to identify beat onsets.
+ *
+ * @param {AudioBuffer} audioBuffer - Decoded audio buffer from Web Audio API
+ * @returns {BeatMarker[]} Array of detected beat markers with time and strength
+ *
+ * @example
+ * const beats = detectBeats(audioBuffer);
+ * console.log(`Detected ${beats.length} beats`);
  */
 const detectBeats = (audioBuffer: AudioBuffer): BeatMarker[] => {
   const channelData = audioBuffer.getChannelData(0);
@@ -114,7 +140,16 @@ const detectBeats = (audioBuffer: AudioBuffer): BeatMarker[] => {
 };
 
 /**
- * Estimate BPM from beat markers
+ * Estimates the tempo (BPM) from detected beat markers.
+ * Uses median interval between beats for robustness against outliers.
+ * Includes sanity checking and correction for common detection errors (half/double tempo).
+ *
+ * @param {BeatMarker[]} beatMarkers - Array of detected beat markers
+ * @returns {number} Estimated beats per minute (BPM), or 0 if insufficient data
+ *
+ * @example
+ * const bpm = estimateBPM(beatMarkers);
+ * console.log(`Tempo: ${bpm} BPM`);
  */
 const estimateBPM = (beatMarkers: BeatMarker[]): number => {
   if (beatMarkers.length < 2) return 0;
@@ -143,7 +178,18 @@ const estimateBPM = (beatMarkers: BeatMarker[]): number => {
 };
 
 /**
- * Analyze how well timeline events align with beats
+ * Analyzes how well timeline events (cuts) align with detected beats.
+ * Uses a 200ms tolerance window to determine if a cut is "on beat".
+ * Identifies and quantifies off-beat cuts with their timing offsets.
+ *
+ * @param {BeatMarker[]} beatMarkers - Array of detected beat markers
+ * @param {TimelineEvent[]} timelineEvents - Array of timeline events to analyze
+ * @returns {{ onBeatCount: number; offBeatCuts: { timestamp: string; offset: number }[] }}
+ *   Analysis results with count of on-beat cuts and details of off-beat cuts
+ *
+ * @example
+ * const { onBeatCount, offBeatCuts } = analyzeAlignment(beats, events);
+ * console.log(`${onBeatCount} cuts are on beat, ${offBeatCuts.length} are off`);
  */
 const analyzeAlignment = (
   beatMarkers: BeatMarker[],
@@ -185,7 +231,17 @@ const analyzeAlignment = (
 };
 
 /**
- * Generate suggestions based on sync analysis
+ * Generates actionable suggestions based on music sync analysis results.
+ * Provides feedback on sync quality and specific recommendations for improvement.
+ *
+ * @param {number} syncScore - Overall sync score from 0 to 100
+ * @param {{ timestamp: string; offset: number }[]} offBeatCuts - Array of off-beat cuts
+ * @param {number} bpm - Detected beats per minute
+ * @returns {string[]} Array of suggestion strings for the user
+ *
+ * @example
+ * const suggestions = generateSuggestions(75, offBeatCuts, 128);
+ * suggestions.forEach(s => console.log(s));
  */
 const generateSuggestions = (
   syncScore: number,

@@ -1,8 +1,24 @@
+/**
+ * WebGL-based video effects processor for real-time color correction.
+ * Implements GPU-accelerated color grading using custom fragment shaders.
+ * Provides controls for exposure, brightness, contrast, saturation, temperature, and tint.
+ * @module utils/videoEffects
+ */
+
 import { VideoEffects } from '../types';
 import logger from './logger';
 
 /**
- * WebGL-based video effects for real-time color correction
+ * WebGL-based video effects processor class.
+ * Renders video to canvas with real-time color correction using custom shaders.
+ * Supports multiple color correction parameters applied in real-time.
+ *
+ * @class
+ * @example
+ * const processor = new VideoEffectsProcessor(videoElement, canvasElement);
+ * processor.startRenderLoop(effects);
+ * // Later...
+ * processor.destroy();
  */
 export class VideoEffectsProcessor {
   private canvas: HTMLCanvasElement;
@@ -22,6 +38,18 @@ export class VideoEffectsProcessor {
     exposure?: WebGLUniformLocation | null;
   } = {};
 
+  /**
+   * Creates a new VideoEffectsProcessor instance.
+   * Initializes WebGL context and compiles shaders for color correction.
+   *
+   * @param {HTMLVideoElement} video - The source video element to process
+   * @param {HTMLCanvasElement} canvas - The canvas element to render effects to
+   *
+   * @example
+   * const videoEl = document.getElementById('video') as HTMLVideoElement;
+   * const canvasEl = document.getElementById('canvas') as HTMLCanvasElement;
+   * const processor = new VideoEffectsProcessor(videoEl, canvasEl);
+   */
   constructor(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
     this.video = video;
     this.canvas = canvas;
@@ -188,6 +216,14 @@ export class VideoEffectsProcessor {
     logger.debug('WebGL initialized for video effects');
   }
 
+  /**
+   * Creates and compiles a WebGL shader from source code.
+   *
+   * @private
+   * @param {number} type - Shader type (gl.VERTEX_SHADER or gl.FRAGMENT_SHADER)
+   * @param {string} source - GLSL shader source code
+   * @returns {WebGLShader | null} Compiled shader, or null if compilation failed
+   */
   private createShader(type: number, source: string): WebGLShader | null {
     if (!this.gl) return null;
 
@@ -206,6 +242,14 @@ export class VideoEffectsProcessor {
     return shader;
   }
 
+  /**
+   * Creates and links a WebGL program from compiled shaders.
+   *
+   * @private
+   * @param {WebGLShader} vertexShader - Compiled vertex shader
+   * @param {WebGLShader} fragmentShader - Compiled fragment shader
+   * @returns {WebGLProgram | null} Linked program, or null if linking failed
+   */
   private createProgram(vertexShader: WebGLShader, fragmentShader: WebGLShader): WebGLProgram | null {
     if (!this.gl) return null;
 
@@ -226,6 +270,17 @@ export class VideoEffectsProcessor {
     return program;
   }
 
+  /**
+   * Applies color correction effects to the current video frame.
+   * Renders a single frame with the specified effects to the canvas.
+   *
+   * @public
+   * @param {VideoEffects} effects - Color correction parameters to apply
+   *
+   * @example
+   * const effects = { brightness: 0.2, contrast: 0.1, saturation: 0, temperature: 0, tint: 0, exposure: 0.1 };
+   * processor.applyEffects(effects);
+   */
   public applyEffects(effects: VideoEffects): void {
     if (!this.gl || !this.program) return;
 
@@ -257,6 +312,18 @@ export class VideoEffectsProcessor {
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   }
 
+  /**
+   * Starts a continuous render loop to apply effects in real-time.
+   * Automatically syncs with video playback using requestAnimationFrame.
+   * The render loop continues until stopRenderLoop() is called or video ends.
+   *
+   * @public
+   * @param {VideoEffects} effects - Color correction parameters to apply continuously
+   *
+   * @example
+   * const effects = { brightness: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, exposure: 0 };
+   * processor.startRenderLoop(effects);
+   */
   public startRenderLoop(effects: VideoEffects): void {
     const render = () => {
       if (!this.video.paused && !this.video.ended) {
@@ -268,6 +335,15 @@ export class VideoEffectsProcessor {
     render();
   }
 
+  /**
+   * Stops the continuous render loop.
+   * Call this to pause effects processing or before destroying the processor.
+   *
+   * @public
+   *
+   * @example
+   * processor.stopRenderLoop();
+   */
   public stopRenderLoop(): void {
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
@@ -275,6 +351,15 @@ export class VideoEffectsProcessor {
     }
   }
 
+  /**
+   * Cleans up WebGL resources and stops rendering.
+   * Call this when the processor is no longer needed to free memory.
+   *
+   * @public
+   *
+   * @example
+   * processor.destroy();
+   */
   public destroy(): void {
     this.stopRenderLoop();
     if (this.gl && this.program) {
@@ -283,6 +368,16 @@ export class VideoEffectsProcessor {
   }
 }
 
+/**
+ * Default video effects with all parameters set to neutral (0).
+ * Use as a starting point or reset value for color correction.
+ *
+ * @constant
+ * @type {VideoEffects}
+ *
+ * @example
+ * const [effects, setEffects] = useState(defaultEffects);
+ */
 export const defaultEffects: VideoEffects = {
   brightness: 0,
   contrast: 0,

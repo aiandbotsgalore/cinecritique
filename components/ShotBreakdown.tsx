@@ -1,13 +1,38 @@
+/**
+ * Shot-by-shot breakdown display component.
+ * Shows detailed cinematographic analysis for each shot including type, movement,
+ * lighting, and composition notes. Clickable shots for video navigation.
+ * @module components/ShotBreakdown
+ */
+
 import React from 'react';
 import { Shot } from '../types';
 import { Camera, Film, Lightbulb, Layout } from 'lucide-react';
 
+/**
+ * Props for the ShotBreakdown component.
+ */
 interface Props {
+  /** Array of shots to display */
   shots: Shot[];
+  /** Callback when a shot is clicked for navigation */
   onShotClick: (shot: Shot) => void;
 }
 
-const ShotBreakdown: React.FC<Props> = ({ shots, onShotClick }) => {
+/**
+ * Displays a detailed list of all shots in the video with cinematographic analysis.
+ * Each shot shows type, movement, timing, lighting, and composition details.
+ *
+ * @param {Props} props - Component props
+ * @returns {JSX.Element} Rendered shot breakdown list
+ *
+ * @example
+ * <ShotBreakdown
+ *   shots={analysis.shots}
+ *   onShotClick={(shot) => videoRef.current.currentTime = shot.startSeconds}
+ * />
+ */
+const ShotBreakdown: React.FC<Props> = ({ shots, onShotClick}) => {
   if (!shots || shots.length === 0) {
     return (
       <div className="text-center text-slate-500 py-8">

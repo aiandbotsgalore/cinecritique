@@ -1,12 +1,37 @@
+/**
+ * Visual timeline chart displaying issue severity across the video.
+ * Uses a bar chart with color-coded severity levels (red, amber, blue).
+ * Clickable bars for navigating to specific timeline issues.
+ * @module components/TimelineChart
+ */
+
 import React from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { TimelineEvent } from '../types';
 
+/**
+ * Props for the TimelineChart component.
+ */
 interface Props {
+  /** Array of timeline events to visualize */
   data: TimelineEvent[];
+  /** Callback when a timeline event is clicked */
   onSelect: (event: TimelineEvent) => void;
 }
 
+/**
+ * Interactive bar chart showing video issue severity over time.
+ * Color codes: Red (severity > 7), Amber (severity > 4), Blue (severity ≤ 4).
+ *
+ * @param {Props} props - Component props
+ * @returns {JSX.Element} Rendered timeline chart
+ *
+ * @example
+ * <TimelineChart
+ *   data={critiqueAnalysis.timeline}
+ *   onSelect={(event) => seekToTimestamp(event.seconds)}
+ * />
+ */
 const TimelineChart: React.FC<Props> = ({ data, onSelect }) => {
   return (
     <div className="h-64 w-full bg-slate-800 rounded-xl p-4 shadow-lg border border-slate-700">

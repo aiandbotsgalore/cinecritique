@@ -1,12 +1,33 @@
+/**
+ * Interactive chat interface for asking questions about the video critique.
+ * Connects to Gemini AI via the GeminiContext to provide context-aware responses.
+ * Auto-scrolls to latest messages and handles loading states.
+ * @module components/ChatInterface
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { ChatMessage, ChatRole } from '../types';
 import { useGemini } from '../contexts/GeminiContext';
 
+/**
+ * Props for the ChatInterface component.
+ */
 interface Props {
+  /** Optional array of initial chat messages to display */
   initialMessages?: ChatMessage[];
 }
 
+/**
+ * Chat interface component for interactive Q&A about video critique.
+ * Displays conversation history and allows users to ask follow-up questions.
+ *
+ * @param {Props} props - Component props
+ * @returns {JSX.Element} Rendered chat interface
+ *
+ * @example
+ * <ChatInterface initialMessages={savedChatHistory} />
+ */
 const ChatInterface: React.FC<Props> = ({ initialMessages = [] }) => {
   const { sendMessage } = useGemini();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);

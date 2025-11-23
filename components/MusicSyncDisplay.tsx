@@ -1,11 +1,32 @@
+/**
+ * Music synchronization analysis display component.
+ * Shows BPM, sync score, beat markers, off-beat cuts, and improvement suggestions.
+ * Color-coded sync quality indicators from excellent to needs work.
+ * @module components/MusicSyncDisplay
+ */
+
 import React from 'react';
 import { MusicSyncAnalysis } from '../types';
 import { Music, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 
+/**
+ * Props for the MusicSyncDisplay component.
+ */
 interface Props {
+  /** Music synchronization analysis data from Web Audio API */
   musicSync: MusicSyncAnalysis;
 }
 
+/**
+ * Displays music sync analysis including BPM, sync score, and recommendations.
+ * Shows color-coded quality indicator and lists off-beat cuts with timing offsets.
+ *
+ * @param {Props} props - Component props
+ * @returns {JSX.Element | null} Rendered music sync display or null if no data
+ *
+ * @example
+ * <MusicSyncDisplay musicSync={analysis.musicSync} />
+ */
 const MusicSyncDisplay: React.FC<Props> = ({ musicSync }) => {
   if (!musicSync) return null;
 

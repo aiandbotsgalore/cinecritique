@@ -1,12 +1,33 @@
+/**
+ * Real-time video color correction effects panel.
+ * Provides sliders for exposure, brightness, contrast, saturation, temperature, and tint.
+ * Uses WebGL for GPU-accelerated real-time processing.
+ * @module components/VideoEffectsPanel
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { VideoEffects } from '../types';
 import { VideoEffectsProcessor, defaultEffects } from '../utils/videoEffects';
 import { Sliders, RotateCcw, Eye, EyeOff } from 'lucide-react';
 
+/**
+ * Props for the VideoEffectsPanel component.
+ */
 interface Props {
+  /** Reference to the video element to apply effects to */
   videoRef: React.RefObject<HTMLVideoElement>;
 }
 
+/**
+ * Interactive panel for real-time video color grading.
+ * Provides controls for 6 color correction parameters with live preview.
+ *
+ * @param {Props} props - Component props
+ * @returns {JSX.Element} Rendered effects control panel
+ *
+ * @example
+ * <VideoEffectsPanel videoRef={videoElementRef} />
+ */
 const VideoEffectsPanel: React.FC<Props> = ({ videoRef }) => {
   const [effects, setEffects] = useState<VideoEffects>(defaultEffects);
   const [isEnabled, setIsEnabled] = useState(false);
